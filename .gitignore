@@ -1,2 +1,5 @@
 env/
+data/
+__pycache__/
+rbm_plots/
 

@@ -414,17 +414,22 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     # find out the number of test samples
     number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
 
-    # pick random test examples, with which to initialize the persistent chain
-    test_idx = rng.randint(number_of_test_samples - n_chains)
+
+    # start chains from random samples
     persistent_vis_chain = theano.shared(
         numpy.asarray(
-            test_set_x.get_value(borrow=True)[test_idx:test_idx + n_chains],
+            rng.uniform(
+                low=0.0,
+                high=1.0,
+                size=(n_chains, 28 * 28)
+                ),
             dtype=theano.config.floatX
         )
     )
+            
     # end-snippet-6 start-snippet-7
     plot_every = 1000
-    # define one step of Gibbs sampling (mf = mean-field) define a
+    # define one step of Gibbs sampling (mf = mean-field), define a
     # function that does `plot_every` steps before returning the
     # sample for plotting
     (

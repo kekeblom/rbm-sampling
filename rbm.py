@@ -132,7 +132,7 @@ class RBM(object):
         # other than shared variables created in this function.
         self.params = [self.W, self.hbias, self.vbias]
 
-        self.gibbs_sampler = GibbsSampler(self.theano_rng, self)
+        self.sampler = GibbsSampler(self.theano_rng, self)
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''

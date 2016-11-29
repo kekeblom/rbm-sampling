@@ -375,11 +375,17 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
     for epoch in range(training_epochs):
 
         # go through the training set
+        stime = timeit.default_timer()
         mean_cost = []
+        
+        print("Minibatch count: {0}".format(n_train_batches))
         for batch_index in range(n_train_batches):
             mean_cost += [train_rbm(batch_index)]
 
-        print('Training epoch %d, cost is ' % epoch, numpy.mean(mean_cost))
+                
+        etime = timeit.default_timer()
+
+        print('Training epoch {0}, cost is {1};  time taken: {2:.01f} s'.format( epoch, numpy.mean(mean_cost), etime - stime))
 
         # Plot filters after each training epoch
         plotting_start = timeit.default_timer()

@@ -32,7 +32,6 @@ from logistic_sgd import load_data
 from sampling import GibbsSampler
 from sampling import HamiltonianMonteCarloSampler
 
-
 # start-snippet-1
 class RBM(object):
     """Restricted Boltzmann Machine (RBM)  """
@@ -42,7 +41,6 @@ class RBM(object):
         n_visible=784,
         n_hidden=500,
         W=None,
-        sampler=None,
         hbias=None,
         vbias=None,
         numpy_rng=None,
@@ -135,7 +133,7 @@ class RBM(object):
         self.params = [self.W, self.hbias, self.vbias]
 
         self.sampler = GibbsSampler(self.theano_rng, self)
-        
+
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
         first_part = 0.5 * T.sum(T.power(v_sample-self.vbias,2), axis=1)
@@ -162,7 +160,7 @@ class RBM(object):
         """
 
         # compute positive phase
-        pre_sigmoid_ph, ph_mean, ph_sample = self.sampler.sample_h_given_v(self.input)
+        pre_sigmoid_ph, ph_mean, ph_sample = self.gibbs_sampler.sample_h_given_v(self.input)
 
         # decide how to initialize persistent chain:
         # for CD, we use the newly generate hidden sample
@@ -189,7 +187,7 @@ class RBM(object):
             ],
             updates
         ) = theano.scan(
-            self.sampler.update_hidden_visible_hidden,
+            self.gibbs_sampler.update_hidden_visible_hidden,
             # the None are place holders, saying that
             # chain_start is the initial state corresponding to the
             # 6th output
@@ -296,8 +294,13 @@ class RBM(object):
         return cross_entropy
 
 
+<<<<<<< 06f55d94f4b7a8c21f2ef32094aa57f4e8117b85
 def test_rbm(learning_rate=0.01, training_epochs=15,
              dataset='./data/mnist.pkl.gz', batch_size=100,
+=======
+def test_rbm(learning_rate=0.1, training_epochs=3,
+             dataset='./data/mnist.pkl.gz', batch_size=20,
+>>>>>>> untested hamiltonian monte carlo code
              n_chains=20, n_samples=10, output_folder='rbm_plots',
              n_hidden=100):
     """
@@ -385,12 +388,12 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
             # go through the training set
             stime = timeit.default_timer()
             mean_cost = []
-            
+
             print("Minibatch count: {0}".format(n_train_batches))
             for batch_index in range(n_train_batches):
                 mean_cost += [train_rbm(batch_index)]
 
-                    
+
             etime = timeit.default_timer()
 
             print('Training epoch {0}, cost is {1};  time taken: {2:.01f} s'.format( epoch, numpy.mean(mean_cost), etime - stime))
@@ -416,10 +419,10 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
 
         print ('Training took %f minutes' % (pretraining_time / 60.))
         # end-snippet-5 start-snippet-6
-    
+
         # serialize rbm
         pickle.dump(rbm, open(RBM_FILE, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-    
+
     # TODO: Implement this sampler override!
     #rbm.sampler = HamiltonianMonteCarloSampler(rbm.theano_rng, rbm, ...
     #self.sampler = GibbsSampler(self.theano_rng, self)
@@ -436,13 +439,12 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     #        stepsize_inc=1.02,
     #        avg_acceptance_slowness=1.0,
     #        ):
-    
+
     #################################
     #     Sampling from the RBM     #
     #################################
     # find out the number of test samples
     number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
-
 
     # start chains from random samples
     persistent_vis_chain = theano.shared(
@@ -455,7 +457,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
             dtype=theano.config.floatX
         )
     )
-            
+
     # end-snippet-6 start-snippet-7
     plot_every = 1000
     # define one step of Gibbs sampling (mf = mean-field), define a
@@ -472,7 +474,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
         ],
         updates
     ) = theano.scan(
-        rbm.sampler.update_visible_hidden_visible,
+        rbm.gibbs_sampler.update_visible_hidden_visible,
         outputs_info=[None, None, None, None, None, persistent_vis_chain],
         n_steps=plot_every,
         name="update_visible_hidden_visible"

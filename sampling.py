@@ -84,7 +84,6 @@ class HamiltonianMonteCarloSampler(object):
             random,
             rbm,
             shared_positions,
-            energy_fn,
             initial_stepsize=0.01,
             target_acceptance_rate=.9,
             n_steps=20,
@@ -92,10 +91,8 @@ class HamiltonianMonteCarloSampler(object):
             stepsize_min=0.001,
             stepsize_max=0.25,
             stepsize_inc=1.02,
-            avg_acceptance_slowness=1.0,
-            ):
+            avg_acceptance_slowness=1.0):
         self.random = random
-        self.energy_fn = energy_fn
         self.rbm = rbm
 
         # allocate shared variables
@@ -132,6 +129,9 @@ class HamiltonianMonteCarloSampler(object):
 
         # compile theano function
         self.simulate = function([], [], updates=simulate_updates)
+
+        self.energy_fn = self.rbm.free_energy
+
 
     def draw(self):
         self.simulate()

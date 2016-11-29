@@ -30,6 +30,7 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 from utils import tile_raster_images
 from logistic_sgd import load_data
 from sampling import GibbsSampler
+from sampling import HamiltonianMonteCarloSampler
 
 
 # start-snippet-1
@@ -134,7 +135,7 @@ class RBM(object):
         self.params = [self.W, self.hbias, self.vbias]
 
         self.sampler = GibbsSampler(self.theano_rng, self)
-
+        
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
         first_part = 0.5 * T.sum(T.power(v_sample-self.vbias,2), axis=1)
@@ -418,7 +419,24 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     
         # serialize rbm
         pickle.dump(rbm, open(RBM_FILE, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
-                
+    
+    # TODO: Implement this sampler override!
+    #rbm.sampler = HamiltonianMonteCarloSampler(rbm.theano_rng, rbm, ...
+    #self.sampler = GibbsSampler(self.theano_rng, self)
+    #        random,
+    #        rbm,
+    #        shared_positions,
+    #        energy_fn,
+    #        initial_stepsize=0.01,
+    #        target_acceptance_rate=.9,
+    #        n_steps=20,
+    #        stepsize_dec=0.98,
+    #        stepsize_min=0.001,
+    #        stepsize_max=0.25,
+    #        stepsize_inc=1.02,
+    #        avg_acceptance_slowness=1.0,
+    #        ):
+    
     #################################
     #     Sampling from the RBM     #
     #################################

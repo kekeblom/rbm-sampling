@@ -132,14 +132,14 @@ class RBM(object):
         # other than shared variables created in this function.
         self.params = [self.W, self.hbias, self.vbias]
 
-        self.sampler = sampler(self.theano_rng, self)
+        self.gibbs_sampler = GibbsSampler(self.theano_rng, self)
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
+        first_part = 0.5 * T.sum(T.power(v_sample-self.vbias,2), axis=1)
         wx_b = T.dot(v_sample, self.W) + self.hbias
-        vbias_term = T.dot(v_sample, self.vbias)
-        hidden_term = T.sum(T.log(1 + T.exp(wx_b)), axis=1)
-        return -hidden_term - vbias_term
+        second_part= T.sum(T.log(1 + T.exp(wx_b)), axis=1)
+        return first_part - second_part
 
     def get_cost_updates(self, lr=0.1, persistent=None, k=1):
         """This functions implements one step of CD-k or PCD-k

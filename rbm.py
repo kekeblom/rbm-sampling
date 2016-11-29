@@ -297,7 +297,7 @@ class RBM(object):
 def test_rbm(learning_rate=0.01, training_epochs=15,
              dataset='./data/mnist.pkl.gz', batch_size=100,
              n_chains=20, n_samples=10, output_folder='rbm_plots',
-             n_hidden=500):
+             n_hidden=100):
     """
     Demonstrate how to train and afterwards sample from it using Theano.
 

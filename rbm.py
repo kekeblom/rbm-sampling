@@ -23,6 +23,7 @@ import numpy
 import theano
 import theano.tensor as T
 import os
+import cPickle as pickle
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
@@ -337,77 +338,87 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
                                                  dtype=theano.config.floatX),
                                      borrow=True)
 
-    # construct the RBM class
-    rbm = RBM(input=x,
-            n_visible=28 * 28,
-            n_hidden=n_hidden,
-            numpy_rng=rng,
-            theano_rng=theano_rng,
-            sampler=GibbsSampler)
-
-    # get the cost and the gradient corresponding to one step of CD-15
-    cost, updates = rbm.get_cost_updates(lr=learning_rate,
-                                         persistent=persistent_chain, k=15)
-
-    #################################
-    #     Training the RBM          #
-    #################################
+    # prepare for outputting data
     if not os.path.isdir(output_folder):
         os.makedirs(output_folder)
     os.chdir(output_folder)
 
-    # it is ok for a theano function to have no output
-    # the purpose of train_rbm is solely to update the RBM parameters
-    train_rbm = theano.function(
-        [index],
-        cost,
-        updates=updates,
-        givens={
-            x: train_set_x[index * batch_size: (index + 1) * batch_size]
-        },
-        name='train_rbm'
-    )
+    # construct or load the RBM class
+    RBM_FILE = 'rbm.save'
+    if os.path.exists(RBM_FILE):
+        rbm = pickle.load(open(RBM_FILE, 'rb'))
+    else:
+        rbm = RBM(input=x,
+                n_visible=28 * 28,
+                n_hidden=n_hidden,
+                numpy_rng=rng,
+                theano_rng=theano_rng,
+                sampler=GibbsSampler)
 
-    plotting_time = 0.
-    start_time = timeit.default_timer()
+        # get the cost and the gradient corresponding to one step of CD-15
+        cost, updates = rbm.get_cost_updates(lr=learning_rate,
+                                             persistent=persistent_chain, k=15)
 
-    # go through training epochs
-    for epoch in range(training_epochs):
+        #################################
+        #     Training the RBM          #
+        #################################
 
-        # go through the training set
-        stime = timeit.default_timer()
-        mean_cost = []
-        
-        print("Minibatch count: {0}".format(n_train_batches))
-        for batch_index in range(n_train_batches):
-            mean_cost += [train_rbm(batch_index)]
-
-                
-        etime = timeit.default_timer()
-
-        print('Training epoch {0}, cost is {1};  time taken: {2:.01f} s'.format( epoch, numpy.mean(mean_cost), etime - stime))
-
-        # Plot filters after each training epoch
-        plotting_start = timeit.default_timer()
-        # Construct image from the weight matrix
-        image = Image.fromarray(
-            tile_raster_images(
-                X=rbm.W.get_value(borrow=True).T,
-                img_shape=(28, 28),
-                tile_shape=(10, 10),
-                tile_spacing=(1, 1)
-            )
+        # it is ok for a theano function to have no output
+        # the purpose of train_rbm is solely to update the RBM parameters
+        train_rbm = theano.function(
+            [index],
+            cost,
+            updates=updates,
+            givens={
+                x: train_set_x[index * batch_size: (index + 1) * batch_size]
+            },
+            name='train_rbm'
         )
-        image.save('filters_at_epoch_%i.png' % epoch)
-        plotting_stop = timeit.default_timer()
-        plotting_time += (plotting_stop - plotting_start)
 
-    end_time = timeit.default_timer()
+        plotting_time = 0.
+        start_time = timeit.default_timer()
 
-    pretraining_time = (end_time - start_time) - plotting_time
+        # go through training epochs
+        for epoch in range(training_epochs):
 
-    print ('Training took %f minutes' % (pretraining_time / 60.))
-    # end-snippet-5 start-snippet-6
+            # go through the training set
+            stime = timeit.default_timer()
+            mean_cost = []
+            
+            print("Minibatch count: {0}".format(n_train_batches))
+            for batch_index in range(n_train_batches):
+                mean_cost += [train_rbm(batch_index)]
+
+                    
+            etime = timeit.default_timer()
+
+            print('Training epoch {0}, cost is {1};  time taken: {2:.01f} s'.format( epoch, numpy.mean(mean_cost), etime - stime))
+
+            # Plot filters after each training epoch
+            plotting_start = timeit.default_timer()
+            # Construct image from the weight matrix
+            image = Image.fromarray(
+                tile_raster_images(
+                    X=rbm.W.get_value(borrow=True).T,
+                    img_shape=(28, 28),
+                    tile_shape=(10, 10),
+                    tile_spacing=(1, 1)
+                )
+            )
+            image.save('filters_at_epoch_%i.png' % epoch)
+            plotting_stop = timeit.default_timer()
+            plotting_time += (plotting_stop - plotting_start)
+
+        end_time = timeit.default_timer()
+
+        pretraining_time = (end_time - start_time) - plotting_time
+
+        print ('Training took %f minutes' % (pretraining_time / 60.))
+        # end-snippet-5 start-snippet-6
+    
+        # serialize rbm
+        pickle.dump(rbm, open(RBM_FILE, 'wb'), protocol=pickle.HIGHEST_PROTOCOL)
+                
     #################################
     #     Sampling from the RBM     #
     #################################

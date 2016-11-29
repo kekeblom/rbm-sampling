@@ -28,6 +28,7 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from utils import tile_raster_images
 from logistic_sgd import load_data
+from sampling import GibbsSampler
 
 
 # start-snippet-1
@@ -39,6 +40,7 @@ class RBM(object):
         n_visible=784,
         n_hidden=500,
         W=None,
+        sampler=None,
         hbias=None,
         vbias=None,
         numpy_rng=None,
@@ -129,7 +131,8 @@ class RBM(object):
         # **** WARNING: It is not a good idea to put things in this list
         # other than shared variables created in this function.
         self.params = [self.W, self.hbias, self.vbias]
-        # end-snippet-1
+
+        self.sampler = sampler(self.theano_rng, self)
 
     def free_energy(self, v_sample):
         ''' Function to compute the free energy '''
@@ -138,78 +141,6 @@ class RBM(object):
         hidden_term = T.sum(T.log(1 + T.exp(wx_b)), axis=1)
         return -hidden_term - vbias_term
 
-    def propup(self, vis):
-        '''This function propagates the visible units activation upwards to
-        the hidden units
-
-        Note that we return also the pre-sigmoid activation of the
-        layer. As it will turn out later, due to how Theano deals with
-        optimizations, this symbolic variable will be needed to write
-        down a more stable computational graph (see details in the
-        reconstruction cost function)
-
-        '''
-        pre_sigmoid_activation = T.dot(vis, self.W) + self.hbias
-        return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
-
-    def sample_h_given_v(self, v0_sample):
-        ''' This function infers state of hidden units given visible units '''
-        # compute the activation of the hidden units given a sample of
-        # the visibles
-        pre_sigmoid_h1, h1_mean = self.propup(v0_sample)
-        # get a sample of the hiddens given their activation
-        # Note that theano_rng.binomial returns a symbolic sample of dtype
-        # int64 by default. If we want to keep our computations in floatX
-        # for the GPU we need to specify to return the dtype floatX
-        h1_sample = self.theano_rng.binomial(size=h1_mean.shape,
-                                             n=1, p=h1_mean,
-                                             dtype=theano.config.floatX)
-        return [pre_sigmoid_h1, h1_mean, h1_sample]
-
-    def propdown(self, hid):
-        '''This function propagates the hidden units activation downwards to
-        the visible units
-
-        Note that we return also the pre_sigmoid_activation of the
-        layer. As it will turn out later, due to how Theano deals with
-        optimizations, this symbolic variable will be needed to write
-        down a more stable computational graph (see details in the
-        reconstruction cost function)
-
-        '''
-        pre_sigmoid_activation = T.dot(hid, self.W.T) + self.vbias
-        return [pre_sigmoid_activation, T.nnet.sigmoid(pre_sigmoid_activation)]
-
-    def sample_v_given_h(self, h0_sample):
-        ''' This function infers state of visible units given hidden units '''
-        # compute the activation of the visible given the hidden sample
-        pre_sigmoid_v1, v1_mean = self.propdown(h0_sample)
-        # get a sample of the visible given their activation
-        # Note that theano_rng.binomial returns a symbolic sample of dtype
-        # int64 by default. If we want to keep our computations in floatX
-        # for the GPU we need to specify to return the dtype floatX
-        v1_sample = self.theano_rng.binomial(size=v1_mean.shape,
-                                             n=1, p=v1_mean,
-                                             dtype=theano.config.floatX)
-        return [pre_sigmoid_v1, v1_mean, v1_sample]
-
-    def gibbs_hvh(self, h0_sample):
-        ''' This function implements one step of Gibbs sampling,
-            starting from the hidden state'''
-        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h0_sample)
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
-        return [pre_sigmoid_v1, v1_mean, v1_sample,
-                pre_sigmoid_h1, h1_mean, h1_sample]
-
-    def gibbs_vhv(self, v0_sample):
-        ''' This function implements one step of Gibbs sampling,
-            starting from the visible state'''
-        pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v0_sample)
-        pre_sigmoid_v1, v1_mean, v1_sample = self.sample_v_given_h(h1_sample)
-        return [pre_sigmoid_h1, h1_mean, h1_sample,
-                pre_sigmoid_v1, v1_mean, v1_sample]
-
-    # start-snippet-2
     def get_cost_updates(self, lr=0.1, persistent=None, k=1):
         """This functions implements one step of CD-k or PCD-k
 
@@ -229,7 +160,7 @@ class RBM(object):
         """
 
         # compute positive phase
-        pre_sigmoid_ph, ph_mean, ph_sample = self.sample_h_given_v(self.input)
+        pre_sigmoid_ph, ph_mean, ph_sample = self.sampler.sample_h_given_v(self.input)
 
         # decide how to initialize persistent chain:
         # for CD, we use the newly generate hidden sample
@@ -256,13 +187,13 @@ class RBM(object):
             ],
             updates
         ) = theano.scan(
-            self.gibbs_hvh,
+            self.sampler.update_hidden_visible_hidden,
             # the None are place holders, saying that
             # chain_start is the initial state corresponding to the
             # 6th output
             outputs_info=[None, None, None, None, None, chain_start],
             n_steps=k,
-            name="gibbs_hvh"
+            name="update_hidden_visible_hidden"
         )
         # start-snippet-3
         # determine gradients on RBM parameters
@@ -292,7 +223,6 @@ class RBM(object):
                                                            pre_sigmoid_nvs[-1])
 
         return monitoring_cost, updates
-        # end-snippet-4
 
     def get_pseudo_likelihood_cost(self, updates):
         """Stochastic approximation to the pseudo-likelihood"""
@@ -408,8 +338,12 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
                                      borrow=True)
 
     # construct the RBM class
-    rbm = RBM(input=x, n_visible=28 * 28,
-              n_hidden=n_hidden, numpy_rng=rng, theano_rng=theano_rng)
+    rbm = RBM(input=x,
+            n_visible=28 * 28,
+            n_hidden=n_hidden,
+            numpy_rng=rng,
+            theano_rng=theano_rng,
+            sampler=GibbsSampler)
 
     # get the cost and the gradient corresponding to one step of CD-15
     cost, updates = rbm.get_cost_updates(lr=learning_rate,
@@ -422,7 +356,6 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         os.makedirs(output_folder)
     os.chdir(output_folder)
 
-    # start-snippet-5
     # it is ok for a theano function to have no output
     # the purpose of train_rbm is solely to update the RBM parameters
     train_rbm = theano.function(
@@ -499,10 +432,10 @@ def test_rbm(learning_rate=0.1, training_epochs=15,
         ],
         updates
     ) = theano.scan(
-        rbm.gibbs_vhv,
+        rbm.sampler.update_visible_hidden_visible,
         outputs_info=[None, None, None, None, None, persistent_vis_chain],
         n_steps=plot_every,
-        name="gibbs_vhv"
+        name="update_visible_hidden_visible"
     )
 
     # add to updates the shared variable that takes care of our persistent

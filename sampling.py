@@ -56,9 +56,11 @@ class GibbsSampler(object):
         # Note that random.binomial returns a symbolic sample of dtype
         # int64 by default. If we want to keep our computations in floatX
         # for the GPU we need to specify to return the dtype floatX
-        v1_sample = self.random.binomial(size=v1_mean.shape,
-                                             n=1, p=v1_mean,
-                                             dtype=theano.config.floatX)
+        v1_sample = self.random.normal(
+                size=v1_mean.shape,
+                avg=v1_mean,
+                std=1.0,
+                dtype=theano.config.floatX)
         return [pre_sigmoid_v1, v1_mean, v1_sample]
 
     def update_visible_hidden_visible(self, v0_sample):
@@ -75,4 +77,10 @@ class GibbsSampler(object):
         pre_sigmoid_h1, h1_mean, h1_sample = self.sample_h_given_v(v1_sample)
         return [pre_sigmoid_v1, v1_mean, v1_sample,
                     pre_sigmoid_h1, h1_mean, h1_sample]
+
+
+class HybridMonteCarloSampler(object):
+    def __init__(self, random, rbm):
+        self.random = random
+        self.rbm = rbm
 

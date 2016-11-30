@@ -30,9 +30,9 @@ import theano.tensor as T
 import os
 
 if PYTHON3:
-	import pickle
+    import pickle
 else:
-	import cPickle as pickle
+    import cPickle as pickle
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
@@ -355,10 +355,10 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     # construct or load the RBM class
     RBM_FILE = 'rbm.save'
     if os.path.exists(RBM_FILE):
-		if PYTHON3:
-			rbm = pickle.load(open(RBM_FILE, 'rb'), encoding='latin1')
-		else:
-			rbm = pickle.load(open(RBM_FILE, 'rb'))
+        if PYTHON3:
+            rbm = pickle.load(open(RBM_FILE, 'rb'), encoding='latin1')
+        else:
+            rbm = pickle.load(open(RBM_FILE, 'rb'))
     else:
         rbm = RBM(input=x,
                 n_visible=28 * 28,
@@ -487,7 +487,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
         ],
         updates
     ) = theano.scan(
-        rbm.gibbs_sampler.update_visible_hidden_visible,
+        rbm.sampler.update_visible_hidden_visible,
         outputs_info=[None, None, None, None, None, persistent_vis_chain],
         n_steps=plot_every,
         name="update_visible_hidden_visible"

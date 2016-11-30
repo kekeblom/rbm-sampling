@@ -11,6 +11,11 @@ to those without visible-visible and hidden-hidden connections.
 
 from __future__ import print_function
 
+
+import sys
+PYTHON3 = sys.version_info[0] >= 3
+
+
 import timeit
 
 try:
@@ -23,7 +28,11 @@ import numpy
 import theano
 import theano.tensor as T
 import os
-import pickle
+
+if PYTHON3:
+	import pickle
+else:
+	import cPickle as pickle
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
@@ -31,6 +40,8 @@ from utils import tile_raster_images
 from logistic_sgd import load_data
 from sampling import GibbsSampler
 from sampling import HamiltonianMonteCarloSampler
+
+
 
 # start-snippet-1
 class RBM(object):
@@ -344,7 +355,10 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     # construct or load the RBM class
     RBM_FILE = 'rbm.save'
     if os.path.exists(RBM_FILE):
-        rbm = pickle.load(open(RBM_FILE, 'rb'), encoding='latin1')
+		if PYTHON3:
+			rbm = pickle.load(open(RBM_FILE, 'rb'), encoding='latin1')
+		else:
+			rbm = pickle.load(open(RBM_FILE, 'rb'))
     else:
         rbm = RBM(input=x,
                 n_visible=28 * 28,

@@ -85,14 +85,14 @@ class HamiltonianMonteCarloSampler(object):
             random,
             rbm,
             initial_positions,
-            initial_stepsize=0.01,
-            target_acceptance_rate=.9,
+            initial_stepsize=1e-3,
+            target_acceptance_rate=.65,
             n_steps=20,
             stepsize_decrement=0.98,
             minimum_stepsize=0.001,
             maximum_stepsize=0.25,
             stepsize_increment=1.02,
-            avg_acceptance_slowness=1.0):
+            avg_acceptance_slowness=0.9):
         self.random = random
         self.rbm = rbm
 

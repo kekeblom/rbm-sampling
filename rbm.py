@@ -23,7 +23,7 @@ import numpy
 import theano
 import theano.tensor as T
 import os
-import cPickle as pickle
+import pickle
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
@@ -135,7 +135,6 @@ class RBM(object):
         self.sampler = GibbsSampler(self.theano_rng, self)
 
     def free_energy(self, v_sample):
-        ''' Function to compute the free energy '''
         first_part = 0.5 * T.sum(T.power(v_sample-self.vbias,2), axis=1)
         wx_b = T.dot(v_sample, self.W) + self.hbias
         second_part= T.sum(T.log(1 + T.exp(wx_b)), axis=1)
@@ -160,7 +159,7 @@ class RBM(object):
         """
 
         # compute positive phase
-        pre_sigmoid_ph, ph_mean, ph_sample = self.gibbs_sampler.sample_h_given_v(self.input)
+        pre_sigmoid_ph, ph_mean, ph_sample = self.sampler.sample_h_given_v(self.input)
 
         # decide how to initialize persistent chain:
         # for CD, we use the newly generate hidden sample
@@ -187,7 +186,7 @@ class RBM(object):
             ],
             updates
         ) = theano.scan(
-            self.gibbs_sampler.update_hidden_visible_hidden,
+            self.sampler.update_hidden_visible_hidden,
             # the None are place holders, saying that
             # chain_start is the initial state corresponding to the
             # 6th output
@@ -294,13 +293,8 @@ class RBM(object):
         return cross_entropy
 
 
-<<<<<<< 06f55d94f4b7a8c21f2ef32094aa57f4e8117b85
 def test_rbm(learning_rate=0.01, training_epochs=15,
              dataset='./data/mnist.pkl.gz', batch_size=100,
-=======
-def test_rbm(learning_rate=0.1, training_epochs=3,
-             dataset='./data/mnist.pkl.gz', batch_size=20,
->>>>>>> untested hamiltonian monte carlo code
              n_chains=20, n_samples=10, output_folder='rbm_plots',
              n_hidden=100):
     """
@@ -356,8 +350,7 @@ def test_rbm(learning_rate=0.1, training_epochs=3,
                 n_visible=28 * 28,
                 n_hidden=n_hidden,
                 numpy_rng=rng,
-                theano_rng=theano_rng,
-                sampler=GibbsSampler)
+                theano_rng=theano_rng)
 
         # get the cost and the gradient corresponding to one step of CD-15
         cost, updates = rbm.get_cost_updates(lr=learning_rate,
@@ -439,6 +432,12 @@ def test_rbm(learning_rate=0.1, training_epochs=3,
     #        stepsize_inc=1.02,
     #        avg_acceptance_slowness=1.0,
     #        ):
+
+    hmc_sampler = HamiltonianMonteCarloSampler(
+            theano_rng,
+            rbm,
+            rng.uniform(low=0.0, high=1.0, size=(1, 784)).astype(theano.config.floatX)
+            )
 
     #################################
     #     Sampling from the RBM     #

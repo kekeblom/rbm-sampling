@@ -83,55 +83,56 @@ class HamiltonianMonteCarloSampler(object):
     def __init__(self,
             random,
             rbm,
-            shared_positions,
+            initial_positions,
             initial_stepsize=0.01,
             target_acceptance_rate=.9,
             n_steps=20,
-            stepsize_dec=0.98,
-            stepsize_min=0.001,
-            stepsize_max=0.25,
-            stepsize_inc=1.02,
+            stepsize_decrement=0.98,
+            minimum_stepsize=0.001,
+            maximum_stepsize=0.25,
+            stepsize_increment=1.02,
             avg_acceptance_slowness=1.0):
         self.random = random
         self.rbm = rbm
 
+        self.energy_fn = self.rbm.free_energy
+
         # allocate shared variables
-        stepsize = sharedX(initial_stepsize, 'hmc_stepsize')
-        avg_acceptance_rate = sharedX(target_acceptance_rate,
+        stepsize = theano.shared(initial_stepsize, 'hmc_stepsize')
+        avg_acceptance_rate = theano.shared(target_acceptance_rate,
                                       'avg_acceptance_rate')
+
+        self.positions = theano.shared(initial_positions, 'positions')
+        self.stepsize = stepsize
+        self.minimum_stepsize = minimum_stepsize
+        self.maximum_stepsize = maximum_stepsize
+        self.avg_acceptance_rate = avg_acceptance_rate
+        self.target_acceptance_rate = target_acceptance_rate
+
         # define graph for an `n_steps` HMC simulation
-        accept, final_pos = self.move(
-            shared_positions,
+        accept, final_position = self.move(
+            self.positions,
             stepsize,
             n_steps)
 
         # define the dictionary of updates, to apply on every `simulate` call
         simulate_updates = self.updates(
-            shared_positions,
+            self.positions,
             stepsize,
             avg_acceptance_rate,
-            final_pos=final_pos,
+            final_position=final_position,
             accept=accept,
-            stepsize_min=stepsize_min,
-            stepsize_max=stepsize_max,
-            stepsize_inc=stepsize_inc,
-            stepsize_dec=stepsize_dec,
+            minimum_stepsize=minimum_stepsize,
+            maximum_stepsize=maximum_stepsize,
+            stepsize_increment=stepsize_increment,
+            stepsize_decrement=stepsize_decrement,
             target_acceptance_rate=target_acceptance_rate,
             avg_acceptance_slowness=avg_acceptance_slowness)
 
-        self.positions = shared_positions
-        self.stepsize = stepsize
-        self.stepsize_min = stepsize_min
-        self.stepsize_max = stepsize_max
-        self.avg_acceptance_rate = avg_acceptance_rate
-        self.target_acceptance_rate = target_acceptance_rate
         self._updates = simulate_updates
 
         # compile theano function
-        self.simulate = function([], [], updates=simulate_updates)
-
-        self.energy_fn = self.rbm.free_energy
-
+        self.simulate = theano.function([], [], updates=simulate_updates)
 
     def draw(self):
         self.simulate()
@@ -197,6 +198,7 @@ class HamiltonianMonteCarloSampler(object):
                 previous_energy=self.hamiltonian(positions, initial_velocity),
                 energy_next=self.hamiltonian(final_position, final_velocity)
             )
+        return accept, final_position
 
     def metropolis_hastings_accept(self, previous_energy, energy_next):
         energy_delta = previous_energy - energy_next
@@ -216,13 +218,13 @@ class HamiltonianMonteCarloSampler(object):
             accept,
             target_acceptance_rate,
             stepsize_increment,
-            stepsize_decrease,
+            stepsize_decrement,
             minimum_stepsize,
-            stepsize_maximum,
+            maximum_stepsize,
             avg_acceptance_slowness):
 
-        accept_matrix = accept.dimshuffle(0, *(('x',) * (final_pos.ndim - 1)))
-        new_positions = TT.switch(accept_matrix, final_pos, positions)
+        accept_matrix = accept.dimshuffle(0, *(('x',) * (final_position.ndim - 1)))
+        new_positions = T.switch(accept_matrix, final_position, positions)
 
         mean_dtype = theano.scalar.upcast(accept.dtype, avg_acceptance_rate.dtype)
         new_acceptance_rate = T.add(
@@ -233,11 +235,11 @@ class HamiltonianMonteCarloSampler(object):
         # if acceptance rate is too low, our sampler is too "noisy" and we reduce
         # the stepsize. If it is too high, our sampler is too conservative, we can
         # get away with a larger stepsize (resulting in better mixing).
-        _new_stepsize = TT.switch(avg_acceptance_rate > target_acceptance_rate,
-                                  stepsize * stepsize_inc, stepsize * stepsize_dec)
+        _new_stepsize = T.switch(avg_acceptance_rate > target_acceptance_rate,
+                                  stepsize * stepsize_increment, stepsize * stepsize_decrement)
 
-        # maintain stepsize in [stepsize_min, stepsize_max]
-        new_stepsize = TT.clip(_new_stepsize, stepsize_min, stepsize_max)
+        # maintain stepsize in [minimum_stepsize, maximum_stepsize]
+        new_stepsize = T.clip(_new_stepsize, minimum_stepsize, maximum_stepsize)
 
         return [(positions, new_positions),
             (stepsize, new_stepsize),

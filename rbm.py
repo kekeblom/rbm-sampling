@@ -438,6 +438,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
 
     USE_HMC = True
+    plot_every = 100
     
     if USE_HMC:
         # HMC sampling
@@ -456,7 +457,9 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
         for idx in range(n_samples):
             # generate `plot_every` intermediate samples that we discard,
             # because successive samples in the chain are too correlated
-            vis_mf = hmc_sampler.draw()
+            for i in range(plot_every):
+                vis_mf = hmc_sampler.draw()
+            
             print(' ... plotting sample %d' % idx)
             image_data[29 * idx:29 * idx + 28, :] = tile_raster_images(
                 X=vis_mf,
@@ -481,7 +484,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
         )
 
         # end-snippet-6 start-snippet-7
-        plot_every = 1000
+
         # define one step of Gibbs sampling (mf = mean-field), define a
         # function that does `plot_every` steps before returning the
         # sample for plotting

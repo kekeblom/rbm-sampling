@@ -344,7 +344,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     # construct or load the RBM class
     RBM_FILE = 'rbm.save'
     if os.path.exists(RBM_FILE):
-        rbm = pickle.load(open(RBM_FILE, 'rb'))
+        rbm = pickle.load(open(RBM_FILE, 'rb'), encoding='latin1')
     else:
         rbm = RBM(input=x,
                 n_visible=28 * 28,

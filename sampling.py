@@ -1,4 +1,5 @@
 import theano
+import numpy
 from theano import tensor as T
 
 class GibbsSampler(object):
@@ -98,7 +99,7 @@ class HamiltonianMonteCarloSampler(object):
         self.energy_fn = self.rbm.free_energy
 
         # allocate shared variables
-        stepsize = theano.shared(initial_stepsize, 'hmc_stepsize')
+        stepsize = theano.shared(numpy.cast[theano.config.floatX](initial_stepsize), 'hmc_stepsize')
         avg_acceptance_rate = theano.shared(target_acceptance_rate,
                                       'avg_acceptance_rate')
 

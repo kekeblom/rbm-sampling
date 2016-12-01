@@ -24,6 +24,7 @@ except ImportError:
     import Image
 
 import numpy
+import scipy.misc
 
 import theano
 import theano.tensor as T
@@ -50,7 +51,7 @@ class RBM(object):
         self,
         input=None,
         n_visible=784,
-        n_hidden=500,
+        n_hidden=100,
         W=None,
         hbias=None,
         vbias=None,
@@ -353,6 +354,7 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     os.chdir(output_folder)
 
     # construct or load the RBM class
+    # NOTE: delete file 'rbm.save' to re-train the network!
     RBM_FILE = 'rbm.save'
     if os.path.exists(RBM_FILE):
         if PYTHON3:
@@ -437,21 +439,29 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
     # find out the number of test samples
     number_of_test_samples = test_set_x.get_value(borrow=True).shape[0]
 
-    USE_HMC = True
+    USE_HMC = False
     plot_every = 100
     
     if USE_HMC:
-        # HMC sampling
+        # HMC sampling (does not seem to produce useful samples)
+        # currently supports one chain at a time; run multiple times if needed
         hmc_sampler = HamiltonianMonteCarloSampler(
             theano_rng,
             rbm,
-            rng.uniform(low=0.0, high=1.0, size=(n_chains, 784)).astype(theano.config.floatX)
+            rng.uniform(low=0.0, high=1.0, size=(1, 784)).astype(theano.config.floatX),
+            n_steps=20
         )
+
+        # Debug: output gradient images
+        DEBUG_GRADIENTS = True
+        if DEBUG_GRADIENTS:
+            dE_dpos = T.grad(hmc_sampler.energy_fn(hmc_sampler.positions).sum(), hmc_sampler.positions)
+            get_grad = theano.function([], [dE_dpos], name='get_grad')
         
         # create a space to store the image for plotting ( we need to leave
         # room for the tile_spacing as well)
         image_data = numpy.zeros(
-            (29 * n_samples + 1, 29 * n_chains - 1),
+            (29 * n_samples + 1, 29 * 1 - 1),
             dtype='uint8'
         )
         for idx in range(n_samples):
@@ -459,6 +469,16 @@ def test_rbm(learning_rate=0.01, training_epochs=15,
             # because successive samples in the chain are too correlated
             for i in range(plot_every):
                 vis_mf = hmc_sampler.draw()
+                
+                # output gradients to analyze mixing
+                if DEBUG_GRADIENTS and i % 20 == 0:
+                    print("Avg acceptance rate: {}".format(hmc_sampler.avg_acceptance_rate.get_value()))
+                    print("Stepsize: {}".format(hmc_sampler.stepsize.get_value()))
+                
+                    grad = numpy.asarray(get_grad()).reshape(28, 28)
+                    grad_image = numpy.clip(0.5 + grad * 0.1, 0.0, 1.0)**2.2
+                    
+                    scipy.misc.toimage(grad_image, cmin=0.0, cmax=1.0).save("grad_sample{:02d}_{:04d}.png".format(idx, i))
             
             print(' ... plotting sample %d' % idx)
             image_data[29 * idx:29 * idx + 28, :] = tile_raster_images(
